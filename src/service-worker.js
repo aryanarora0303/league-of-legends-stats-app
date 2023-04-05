@@ -70,3 +70,38 @@ self.addEventListener('message', (event) => {
 });
 
 // Any other custom service worker logic can go here.
+// Any other custom service worker logic can go here.
+console.log("Registering routes");
+registerRoute(
+  new Route(({ url }) => {
+    console.log("Registering my-api-cache route", url, url.pathname);
+    if (url.pathname.includes('matchHistoryDetails')){
+      return true;
+    }
+  },
+  new StaleWhileRevalidate({
+    cacheName: 'my-api-cache',
+    plugins: [
+      new ExpirationPlugin({
+        maxAgeSeconds: 60 * 60, // 1 hour
+      }),
+      {
+        async cacheWillUpdate({ request, response }) {
+          // Cache the response if it's OK and the content type is JSON
+          if (response.ok && response.headers.get('content-type').includes('application/json')) {
+            const responseData = await response.clone().json();
+            if (responseData && Array.isArray(responseData) && responseData.length > 0) {
+              const responseToCache = response.clone();
+              const cache = await caches.open('my-api-cache');
+              cache.put(request, responseToCache);
+            }
+            else {
+              return null;
+            }
+          }
+          return null;
+        },
+      }
+    ],
+  })
+));
